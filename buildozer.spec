@@ -5,7 +5,7 @@ package.domain = org.megagrid
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 0.1
-requirements = python3,kivy,requests
+requirements = python3,kivy,requests,pyjnius
 orientation = portrait
 fullscreen = 0
 
@@ -23,5 +23,4 @@ android.allow_backup = True
 log_level = 2
 warn_on_root = 1
 
-# Forcer l'utilisation de la branche master/stable pour éviter les bugs de venv/pip récents
-p4a.branch = master
+p4a.branch = develop
