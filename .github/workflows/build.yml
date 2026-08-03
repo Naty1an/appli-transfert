@@ -32,10 +32,11 @@ jobs:
             autoconf \
             automake \
             libtool \
+            libltdl-dev \
+            autoconf-archive \
             pkg-config \
             unzip \
-            ant \
-            libltdl-dev
+            ant
 
       - name: Install Buildozer and Cython
         run: |
