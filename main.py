@@ -12,9 +12,17 @@ from kivy.graphics.texture import Texture
 from kivy.utils import platform
 from kivy.core.image import Image as CoreImage
 
+# 1. CORRECTION DU CHEMIN ANDROID (Sans import qui crashe)
 if platform == 'android':
-    from android.storage import primary_external_path
-    BASE_DIR = primary_external_path()
+    from android.permissions import request_permissions, Permission
+    # Demande automatique des permissions obligatoires au démarrage
+    request_permissions([
+        Permission.CAMERA,
+        Permission.READ_EXTERNAL_STORAGE,
+        Permission.WRITE_EXTERNAL_STORAGE
+    ])
+    # Récupération propre et universelle du stockage externe sous Android
+    BASE_DIR = os.getenv("EXTERNAL_STORAGE", "/sdcard")
 else:
     BASE_DIR = os.path.expanduser("~")
 
@@ -23,6 +31,7 @@ try:
     HAS_CV2 = True
 except ImportError:
     HAS_CV2 = False
+
 
 class MegaGridOpticalApp(App):
     def build(self):
@@ -76,7 +85,7 @@ class MegaGridOpticalApp(App):
         root_layout.add_widget(btn_layout)
 
         self.text_output = TextInput(
-            text="Application prête (Sans Pillow, compatible Android).\n", 
+            text="Application prête (Compatible Android & PC).\n", 
             readonly=True, 
             font_size=11,
             size_hint_y=None,
@@ -151,7 +160,6 @@ class MegaGridOpticalApp(App):
                 header = f"TYPE:IMAGE|OW:{orig_w}|OH:{orig_h}|W:{w}|H:{h}\n"
                 full_text = header
                 
-                # Extraction basique via texture Kivy
                 data = img_core.image.read_data()
                 for y in range(h):
                     line_tokens = []
@@ -179,7 +187,6 @@ class MegaGridOpticalApp(App):
 
             for i in range(0, len(binary_data), bits_per_frame):
                 chunk = binary_data[i:i+bits_per_frame]
-                # Génération de texture en mémoire directe pour Kivy
                 pixels = bytearray()
                 for bit in chunk:
                     val = 255 if bit == '1' else 0
