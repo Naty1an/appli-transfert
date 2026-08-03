@@ -36,12 +36,9 @@ jobs:
             autoconf-archive \
             pkg-config \
             unzip \
-            ant
+            ant \
+            zip
 
-      - name: Install Buildozer and Cython
-        run: |
-          pip install --upgrade pip
-          pip install --upgrade cython==0.29.36 buildozer
       - name: Install Buildozer and Cython
         run: |
           pip install --upgrade pip
