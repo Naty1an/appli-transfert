@@ -9,7 +9,7 @@ requirements = python3,kivy,requests,pyjnius,opencv,numpy
 orientation = portrait
 fullscreen = 0
 
-android.permissions = INTERNET
+android.permissions = INTERNET,CAMERA,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
 android.api = 33
 android.minapi = 24
 android.ndk = 25b
