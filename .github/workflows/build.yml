@@ -39,10 +39,10 @@ jobs:
             ant \
             zip
 
-      - name: Install Buildozer and Cython
+      - name: Install Buildozer, Cython and Old Pip
         run: |
           pip install --upgrade pip
-          pip install --upgrade cython==0.29.36 buildozer
+          pip install cython==0.29.36 buildozer==1.5.0
 
       - name: Build with Buildozer
         run: |
