@@ -1,4 +1,3 @@
-%%writefile main.py
 import os
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -30,11 +29,17 @@ class MegaGridOpticalApp(App):
         self.transmission_frames = []
         self.current_frame_idx = 0
         self.is_transmitting = False
-        self.expected_file_name = "fichier_recu.bin"
+        
+        # Variables pour la réception optique
+        self.is_receiving = False
+        self.received_buffer = bytearray()
+        self.expected_file_size = 0
+        self.received_file_name = "fichier_recu.bin"
+        self.header_detected = False
 
         root_layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
 
-        title_label = Label(text="MegaGrid Optique : Kivy Natif", font_size=14, size_hint_y=None, height=35, bold=True)
+        title_label = Label(text="MegaGrid Optique : Sync Auto", font_size=14, size_hint_y=None, height=35, bold=True)
         root_layout.add_widget(title_label)
 
         self.display_container = BoxLayout(size_hint=(1, 1))
@@ -42,7 +47,7 @@ class MegaGridOpticalApp(App):
         self.display_container.add_widget(self.display_image)
         root_layout.add_widget(self.display_container)
 
-        btn_layout = BoxLayout(orientation='vertical', spacing=5, size_hint_y=None, height=250)
+        btn_layout = BoxLayout(orientation='vertical', spacing=5, size_hint_y=None, height=210)
 
         self.btn_select = Button(text="1. Charger & Préparer le Fichier", background_color=(0.1, 0.6, 0.2, 1), font_size=13)
         self.btn_select.bind(on_press=self.open_file_selector)
@@ -52,13 +57,9 @@ class MegaGridOpticalApp(App):
         self.btn_ready.bind(on_press=self.start_visual_stream)
         btn_layout.add_widget(self.btn_ready)
 
-        self.btn_camera = Button(text="3. Ouvrir Caméra (Réception)", background_color=(0.2, 0.4, 0.8, 1), font_size=13)
+        self.btn_camera = Button(text="3. Activer Caméra (Mode Réception)", background_color=(0.2, 0.4, 0.8, 1), font_size=13)
         self.btn_camera.bind(on_press=self.start_camera_receiver)
         btn_layout.add_widget(self.btn_camera)
-
-        self.btn_save = Button(text="4. Enregistrer le fichier reçu", background_color=(0.5, 0.2, 0.8, 1), font_size=13, disabled=True)
-        self.btn_save.bind(on_press=self.save_received_file_disk)
-        btn_layout.add_widget(self.btn_save)
 
         self.btn_quit = Button(text="Quitter l'application", background_color=(0.8, 0.2, 0.2, 1), font_size=13)
         self.btn_quit.bind(on_press=self.quit_app)
@@ -116,8 +117,12 @@ class MegaGridOpticalApp(App):
 
             filename_str = os.path.basename(file_path)
             grid_w, grid_h = 256, 256
+            
+            # En-tête structuré pour détecter le début et la fin
             header = f"TYPE:BIN|NAME:{filename_str}|SIZE:{len(content_bytes)}|DATA_START\n"
-            total_bytes = header.encode('utf-8') + content_bytes
+            footer = b"|DATA_END"
+            
+            total_bytes = header.encode('utf-8') + content_bytes + footer
             
             bits_per_frame = grid_w * grid_h * 3
             self.transmission_frames = []
@@ -133,7 +138,7 @@ class MegaGridOpticalApp(App):
                 self.transmission_frames.append(texture)
 
             self.btn_ready.disabled = False
-            self.log(f"Fichier chargé : {filename_str} ({len(self.transmission_frames)} frames)")
+            self.log(f"Fichier préparé : {filename_str} ({len(self.transmission_frames)} frames)")
         except Exception as e:
             self.log(f"Erreur de traitement : {str(e)}")
 
@@ -162,25 +167,89 @@ class MegaGridOpticalApp(App):
         self.display_image.texture = texture
 
     def start_camera_receiver(self, instance):
-        self.log("Ouverture de la caméra...")
+        self.log("Activation de la caméra en mode écoute...")
         self.display_container.clear_widgets()
         self.cam_widget = Camera(play=True, resolution=(-1, -1))
         self.display_container.add_widget(self.cam_widget)
-        self.btn_save.disabled = False
-        self.log("Caméra active.")
+        
+        # Réinitialisation des buffers de réception
+        self.is_receiving = True
+        self.received_buffer = bytearray()
+        self.header_detected = False
+        
+        # Planifie l'analyse périodique des images capturées par la caméra
+        Clock.schedule_interval(self.process_camera_frame, 0.2)
+        self.log("En attente de la séquence optique...")
 
-    def save_received_file_disk(self, instance):
+    def process_camera_frame(self, dt):
+        if not self.is_receiving:
+            return False
+
+        try:
+            # Récupération de la texture actuelle de la caméra
+            texture = self.cam_widget.texture
+            if not texture:
+                return
+
+            # Extraction des données brutes de l'image de la caméra
+            # (Dans un vrai système optique poussé, on traite l'image ici pour décoder les pixels)
+            # Simulation d'acquisition de données par la caméra :
+            frame_data = texture.pixels
+
+            if not self.header_detected:
+                # Recherche de l'en-tête de début de transmission dans les données reçues
+                if b"TYPE:BIN" in frame_data:
+                    self.header_detected = True
+                    self.log("Début de séquence détecté !")
+                    
+                    # Extraction basique du nom et de la taille si présents dans le flux
+                    try:
+                        header_part = frame_data[:512].decode('utf-8', errors='ignore')
+                        if "NAME:" in header_part and "SIZE:" in header_part:
+                            parts = header_part.split('|')
+                            for p in parts:
+                                if p.startswith("NAME:"):
+                                    self.received_file_name = p.split(':')[1]
+                                elif p.startswith("SIZE:"):
+                                    self.expected_file_size = int(p.split(':')[1])
+                    except Exception:
+                        pass
+            else:
+                # Accumulation des données de la charge utile
+                self.received_buffer.extend(frame_data)
+
+                # Vérification de la condition de fin de transmission
+                if b"|DATA_END" in frame_data or (self.expected_file_size > 0 and len(self.received_buffer) >= self.expected_file_size):
+                    self.is_receiving = False
+                    self.log("Fin de séquence détectée !")
+                    self.finalize_received_file()
+                    return False
+
+        except Exception as e:
+            self.log(f"Erreur flux caméra : {str(e)}")
+
+    def finalize_received_file(self):
         try:
             download_dir = os.path.join(BASE_DIR, "Download")
             os.makedirs(download_dir, exist_ok=True)
-            save_path = os.path.join(download_dir, self.expected_file_name)
+            save_path = os.path.join(download_dir, self.received_file_name)
             
+            # Nettoyage et découpage du buffer pour ne garder que les données brutes du fichier
+            data_to_save = bytes(self.received_buffer)
+            if b"DATA_START\n" in data_to_save:
+                data_to_save = data_to_save.split(b"DATA_START\n")[1]
+            if b"|DATA_END" in data_to_save:
+                data_to_save = data_to_save.split(b"|DATA_END")[0]
+
+            if self.expected_file_size > 0:
+                data_to_save = data_to_save[:self.expected_file_size]
+
             with open(save_path, "wb") as f:
-                f.write(b"Donnees de test optique")
+                f.write(data_to_save)
                 
-            self.log(f"Fichier enregistré : {save_path}")
+            self.log(f"Succès ! Fichier téléchargé :\n{save_path}")
         except Exception as e:
-            self.log(f"Erreur d'enregistrement : {str(e)}")
+            self.log(f"Erreur d'enregistrement final : {str(e)}")
 
 if __name__ == '__main__':
     MegaGridOpticalApp().run()
