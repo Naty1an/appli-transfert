@@ -1,3 +1,4 @@
+%%writefile main.py
 import os
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -11,9 +12,7 @@ from kivy.uix.popup import Popup
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from kivy.utils import platform
-from kivy.core.image import Image as CoreImage
 
-# Gestion des permissions Android
 if platform == 'android':
     from android.permissions import request_permissions, Permission
     request_permissions([
@@ -27,28 +26,17 @@ else:
 
 class MegaGridOpticalApp(App):
     def build(self):
-        self.title = "MegaGrid Optique (Caméra Kivy Native)"
-        
+        self.title = "MegaGrid Optique"
         self.transmission_frames = []
         self.current_frame_idx = 0
         self.is_transmitting = False
-        
-        self.is_receiving = False
-        self.received_binary_stream = ""
         self.expected_file_name = "fichier_recu.bin"
 
         root_layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
 
-        title_label = Label(
-            text="MegaGrid Optique : Mode Natif Kivy", 
-            font_size=14, 
-            size_hint_y=None, 
-            height=35,
-            bold=True
-        )
+        title_label = Label(text="MegaGrid Optique : Kivy Natif", font_size=14, size_hint_y=None, height=35, bold=True)
         root_layout.add_widget(title_label)
 
-        # Conteneur d'affichage (image statique ou caméra)
         self.display_container = BoxLayout(size_hint=(1, 1))
         self.display_image = KivyImage(size_hint=(1, 1))
         self.display_container.add_widget(self.display_image)
@@ -60,11 +48,11 @@ class MegaGridOpticalApp(App):
         self.btn_select.bind(on_press=self.open_file_selector)
         btn_layout.add_widget(self.btn_select)
 
-        self.btn_ready = Button(text="2. Je suis PRÊT (Lancer la séquence)", background_color=(0.9, 0.6, 0.1, 1), font_size=13, disabled=True)
+        self.btn_ready = Button(text="2. Lancer la Séquence Visuelle", background_color=(0.9, 0.6, 0.1, 1), font_size=13, disabled=True)
         self.btn_ready.bind(on_press=self.start_visual_stream)
         btn_layout.add_widget(self.btn_ready)
 
-        self.btn_camera = Button(text="3. Ouvrir Caméra (Réception Optique)", background_color=(0.2, 0.4, 0.8, 1), font_size=13)
+        self.btn_camera = Button(text="3. Ouvrir Caméra (Réception)", background_color=(0.2, 0.4, 0.8, 1), font_size=13)
         self.btn_camera.bind(on_press=self.start_camera_receiver)
         btn_layout.add_widget(self.btn_camera)
 
@@ -78,13 +66,7 @@ class MegaGridOpticalApp(App):
 
         root_layout.add_widget(btn_layout)
 
-        self.text_output = TextInput(
-            text="Application prête.\n", 
-            readonly=True, 
-            font_size=11,
-            size_hint_y=None,
-            height=75
-        )
+        self.text_output = TextInput(text="Application prête.\n", readonly=True, font_size=11, size_hint_y=None, height=75)
         root_layout.add_widget(self.text_output)
 
         return root_layout
@@ -108,7 +90,7 @@ class MegaGridOpticalApp(App):
         btn_box.add_widget(cancel_btn)
         content.add_widget(btn_box)
 
-        popup = Popup(title="Sélectionner un fichier à transmettre", content=content, size_hint=(0.95, 0.95))
+        popup = Popup(title="Sélectionner un fichier", content=content, size_hint=(0.95, 0.95))
 
         def on_select(btn):
             if filechooser.selection:
@@ -134,7 +116,6 @@ class MegaGridOpticalApp(App):
 
             filename_str = os.path.basename(file_path)
             grid_w, grid_h = 256, 256
-            
             header = f"TYPE:BIN|NAME:{filename_str}|SIZE:{len(content_bytes)}|DATA_START\n"
             total_bytes = header.encode('utf-8') + content_bytes
             
@@ -168,13 +149,12 @@ class MegaGridOpticalApp(App):
     def update_stream_frame(self, dt):
         if not self.is_transmitting or self.current_frame_idx >= len(self.transmission_frames):
             self.is_transmitting = False
-            self.log("Fin de la séquence de transmission.")
+            self.log("Fin de la transmission.")
             return False
 
         texture = self.transmission_frames[self.current_frame_idx]
         self.current_frame_idx += 1
         
-        # S'assurer qu'on affiche l'image et non la caméra
         if self.display_container.children[0] != self.display_image:
             self.display_container.clear_widgets()
             self.display_container.add_widget(self.display_image)
@@ -182,15 +162,12 @@ class MegaGridOpticalApp(App):
         self.display_image.texture = texture
 
     def start_camera_receiver(self, instance):
-        self.log("Ouverture de la caméra native...")
+        self.log("Ouverture de la caméra...")
         self.display_container.clear_widgets()
-        
-        # Utilisation du widget Camera natif de Kivy (fonctionne sans OpenCV)
         self.cam_widget = Camera(play=True, resolution=(-1, -1))
         self.display_container.add_widget(self.cam_widget)
-        
         self.btn_save.disabled = False
-        self.log("Caméra active. Prêt pour la réception optique.")
+        self.log("Caméra active.")
 
     def save_received_file_disk(self, instance):
         try:
@@ -199,9 +176,9 @@ class MegaGridOpticalApp(App):
             save_path = os.path.join(download_dir, self.expected_file_name)
             
             with open(save_path, "wb") as f:
-                f.write(b"Donnees reconstituees via Kivy Camera")
+                f.write(b"Donnees de test optique")
                 
-            self.log(f"Fichier enregistré dans : {save_path}")
+            self.log(f"Fichier enregistré : {save_path}")
         except Exception as e:
             self.log(f"Erreur d'enregistrement : {str(e)}")
 
